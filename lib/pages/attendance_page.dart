@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 class AttendancePage extends StatefulWidget {
   const AttendancePage({super.key});
@@ -18,7 +19,37 @@ class _AttendancePageState extends State<AttendancePage> {
   // true = present
   // false = absent
   List<List<bool>> attendance = [];
+  // Stores highlighted attendance cells
+  List<List<bool>> highlighted = [];
 
+  void shareAttendance() {
+    String message = "Attendance Report\n\n";
+
+    for (int studentIndex = 0;
+    studentIndex < registrationNumbers.length;
+    studentIndex++) {
+
+      int presentCount = attendance[studentIndex]
+          .where((present) => present)
+          .length;
+
+      int absentCount = dates.length - presentCount;
+
+      message +=
+      "Registration: ${registrationNumbers[studentIndex]}\n"
+          "Present: $presentCount\n"
+          "Absent: $absentCount\n"
+          "Percentage: "
+          "${getPercentage(studentIndex).toStringAsFixed(1)}%\n\n";
+    }
+
+    SharePlus.instance.share(
+      ShareParams(
+        text: message,
+        subject: "Attendance Report",
+      ),
+    );
+  }
   // Add a student
   void addStudent() {
     final TextEditingController controller =
@@ -62,6 +93,13 @@ class _AttendancePageState extends State<AttendancePage> {
                             (index) => false,
                       ),
                     );
+
+                    highlighted.add(
+                      List.generate(
+                        dates.length,
+                            (index) => false,
+                      ),
+                    );
                   });
 
                   Navigator.pop(context);
@@ -89,6 +127,7 @@ class _AttendancePageState extends State<AttendancePage> {
       // for every existing student.
       for (int i = 0; i < attendance.length; i++) {
         attendance[i].add(false);
+        highlighted[i].add(false);
       }
     });
   }
@@ -176,6 +215,7 @@ class _AttendancePageState extends State<AttendancePage> {
                       ),
                     ),
 
+
                     // Date columns
                     ...dates.map(
                           (date) {
@@ -248,22 +288,41 @@ class _AttendancePageState extends State<AttendancePage> {
                             dates.length,
                                 (dateIndex) {
 
-                              return DataCell(
-                                Checkbox(
-                                  value: attendance[
-                                  studentIndex]
-                                  [dateIndex],
+                                  return DataCell(
+                                    Container(
+                                      width: 60,
+                                      height: 48,
 
-                                  onChanged: (value) {
-                                    setState(() {
-                                      attendance[
-                                      studentIndex]
-                                      [dateIndex] =
-                                          value ?? false;
-                                    });
-                                  },
-                                ),
-                              );
+                                      color: highlighted[studentIndex][dateIndex]
+                                          ? Colors.yellow
+                                          : Colors.transparent,
+
+                                      alignment: Alignment.center,
+
+                                      child: GestureDetector(
+                                        onDoubleTap: () {
+                                          setState(() {
+                                            highlighted[studentIndex][dateIndex] =
+                                            !highlighted[studentIndex][dateIndex];
+                                          });
+                                        },
+
+                                        child: Checkbox(
+                                          value: attendance[studentIndex][dateIndex],
+
+                                          activeColor: Colors.green,
+                                          checkColor: Colors.white,
+
+                                          onChanged: (value) {
+                                            setState(() {
+                                              attendance[studentIndex][dateIndex] =
+                                                  value ?? false;
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  );
                             },
                           ),
 
@@ -298,6 +357,18 @@ class _AttendancePageState extends State<AttendancePage> {
                     },
                   ),
                 ),
+              ),
+            ),
+          ),Padding(
+            padding: const EdgeInsets.all(12),
+
+            child: SizedBox(
+              width: double.infinity,
+
+              child: ElevatedButton.icon(
+                onPressed: shareAttendance,
+                icon: const Icon(Icons.share),
+                label: const Text("Share Attendance"),
               ),
             ),
           ),
