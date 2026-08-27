@@ -77,8 +77,13 @@ class _AttendancePageState extends State<AttendancePage> {
 
   // Add a new date
   void addDate() {
+    final now = DateTime.now();
+
+    String newDate =
+        "${now.day}/${now.month}/${now.year}";
+
     setState(() {
-      dates.add("Day ${dates.length + 1}");
+      dates.add(newDate);
 
       // Add false for the new date
       // for every existing student.
@@ -88,12 +93,36 @@ class _AttendancePageState extends State<AttendancePage> {
     });
   }
 
+  // Calculate attendance percentage
+  double getPercentage(int studentIndex) {
+    if (dates.isEmpty) {
+      return 0;
+    }
+
+    int presentCount = 0;
+
+    for (int i = 0; i < dates.length; i++) {
+      if (attendance[studentIndex][i]) {
+        presentCount++;
+      }
+    }
+
+    return (presentCount / dates.length) * 100;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Attendance"),
+        title: const Text(
+          "Attendance",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
         centerTitle: true,
+        backgroundColor: Colors.blue,
       ),
 
       body: Column(
@@ -137,6 +166,7 @@ class _AttendancePageState extends State<AttendancePage> {
                   border: TableBorder.all(),
 
                   columns: [
+                    // Registration column
                     const DataColumn(
                       label: Text(
                         "Registration",
@@ -146,7 +176,7 @@ class _AttendancePageState extends State<AttendancePage> {
                       ),
                     ),
 
-                    // Create a column for every date
+                    // Date columns
                     ...dates.map(
                           (date) {
                         return DataColumn(
@@ -158,6 +188,16 @@ class _AttendancePageState extends State<AttendancePage> {
                           ),
                         );
                       },
+                    ),
+
+                    // Percentage column
+                    const DataColumn(
+                      label: Text(
+                        "Percentage",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ],
 
@@ -185,7 +225,8 @@ class _AttendancePageState extends State<AttendancePage> {
                               return DataCell(
                                 Checkbox(
                                   value: attendance[
-                                  studentIndex][dateIndex],
+                                  studentIndex]
+                                  [dateIndex],
 
                                   onChanged: (value) {
                                     setState(() {
@@ -198,6 +239,16 @@ class _AttendancePageState extends State<AttendancePage> {
                                 ),
                               );
                             },
+                          ),
+
+                          // Percentage
+                          DataCell(
+                            Text(
+                              "${getPercentage(studentIndex).toStringAsFixed(1)}%",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ],
                       );
