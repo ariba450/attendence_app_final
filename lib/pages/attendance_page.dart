@@ -190,7 +190,27 @@ class _AttendancePageState extends State<AttendancePage> {
                       },
                     ),
 
-                    // Percentage column
+                    // Present column
+                    const DataColumn(
+                      label: Text(
+                        "Present",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+
+// Absent column
+                    const DataColumn(
+                      label: Text(
+                        "Absent",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+
+// Percentage column
                     const DataColumn(
                       label: Text(
                         "Percentage",
@@ -205,6 +225,12 @@ class _AttendancePageState extends State<AttendancePage> {
                   rows: List.generate(
                     registrationNumbers.length,
                         (studentIndex) {
+
+                          int presentCount = attendance[studentIndex]
+                              .where((present) => present)
+                              .length;
+
+                          int absentCount = dates.length - presentCount;
 
                       return DataRow(
                         cells: [
@@ -241,7 +267,24 @@ class _AttendancePageState extends State<AttendancePage> {
                             },
                           ),
 
-                          // Percentage
+
+
+// Percentage
+                          // Present
+                          DataCell(
+                            Text(
+                              presentCount.toString(),
+                            ),
+                          ),
+
+// Absent
+                          DataCell(
+                            Text(
+                              absentCount.toString(),
+                            ),
+                          ),
+
+// Percentage
                           DataCell(
                             Text(
                               "${getPercentage(studentIndex).toStringAsFixed(1)}%",
