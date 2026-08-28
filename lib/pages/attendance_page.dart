@@ -19,8 +19,13 @@ class _AttendancePageState extends State<AttendancePage> {
   // true = present
   // false = absent
   List<List<bool>> attendance = [];
+
   // Stores highlighted attendance cells
   List<List<bool>> highlighted = [];
+
+  // ==========================================
+  // SHARE ATTENDANCE
+  // ==========================================
 
   void shareAttendance() {
     String message = "Attendance Report\n\n";
@@ -28,10 +33,8 @@ class _AttendancePageState extends State<AttendancePage> {
     for (int studentIndex = 0;
     studentIndex < registrationNumbers.length;
     studentIndex++) {
-
-      int presentCount = attendance[studentIndex]
-          .where((present) => present)
-          .length;
+      int presentCount =
+          attendance[studentIndex].where((present) => present).length;
 
       int absentCount = dates.length - presentCount;
 
@@ -50,10 +53,13 @@ class _AttendancePageState extends State<AttendancePage> {
       ),
     );
   }
-  // Add a student
+
+  // ==========================================
+  // ADD STUDENT
+  // ==========================================
+
   void addStudent() {
-    final TextEditingController controller =
-    TextEditingController();
+    final TextEditingController controller = TextEditingController();
 
     showDialog(
       context: context,
@@ -70,6 +76,7 @@ class _AttendancePageState extends State<AttendancePage> {
           ),
 
           actions: [
+            // Cancel button
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
@@ -77,16 +84,18 @@ class _AttendancePageState extends State<AttendancePage> {
               child: const Text("Cancel"),
             ),
 
+            // Add button
             ElevatedButton(
               onPressed: () {
                 if (controller.text.trim().isNotEmpty) {
                   setState(() {
+                    // Add registration number
                     registrationNumbers.add(
                       controller.text.trim(),
                     );
 
                     // Create attendance values
-                    // for all existing dates.
+                    // for all existing dates
                     attendance.add(
                       List.generate(
                         dates.length,
@@ -94,6 +103,7 @@ class _AttendancePageState extends State<AttendancePage> {
                       ),
                     );
 
+                    // Create highlighted values
                     highlighted.add(
                       List.generate(
                         dates.length,
@@ -113,7 +123,10 @@ class _AttendancePageState extends State<AttendancePage> {
     );
   }
 
-  // Add a new date
+  // ==========================================
+  // ADD DATE
+  // ==========================================
+
   void addDate() {
     final now = DateTime.now();
 
@@ -124,7 +137,7 @@ class _AttendancePageState extends State<AttendancePage> {
       dates.add(newDate);
 
       // Add false for the new date
-      // for every existing student.
+      // for every existing student
       for (int i = 0; i < attendance.length; i++) {
         attendance[i].add(false);
         highlighted[i].add(false);
@@ -132,7 +145,10 @@ class _AttendancePageState extends State<AttendancePage> {
     });
   }
 
-  // Calculate attendance percentage
+  // ==========================================
+  // CALCULATE PERCENTAGE
+  // ==========================================
+
   double getPercentage(int studentIndex) {
     if (dates.isEmpty) {
       return 0;
@@ -148,6 +164,10 @@ class _AttendancePageState extends State<AttendancePage> {
 
     return (presentCount / dates.length) * 100;
   }
+
+  // ==========================================
+  // BUILD
+  // ==========================================
 
   @override
   Widget build(BuildContext context) {
@@ -167,13 +187,17 @@ class _AttendancePageState extends State<AttendancePage> {
       body: Column(
         children: [
 
-          // Buttons
+          // ====================================
+          // BUTTONS
+          // ====================================
+
           Padding(
             padding: const EdgeInsets.all(12),
 
             child: Row(
               children: [
 
+                // Add Student
                 ElevatedButton.icon(
                   onPressed: addStudent,
                   icon: const Icon(Icons.person_add),
@@ -182,6 +206,7 @@ class _AttendancePageState extends State<AttendancePage> {
 
                 const SizedBox(width: 10),
 
+                // Add Date
                 ElevatedButton.icon(
                   onPressed: addDate,
                   icon: const Icon(Icons.calendar_month),
@@ -193,173 +218,288 @@ class _AttendancePageState extends State<AttendancePage> {
 
           const Divider(),
 
-          // Attendance table
+          // ====================================
+          // ATTENDANCE TABLE
+          // ====================================
+
           Expanded(
             child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
+              scrollDirection: Axis.vertical,
 
-              child: SingleChildScrollView(
-                scrollDirection: Axis.vertical,
+              child: Row(
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
 
-                child: DataTable(
-                  border: TableBorder.all(),
+                children: [
 
-                  columns: [
-                    // Registration column
-                    const DataColumn(
-                      label: Text(
-                        "Registration",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
+                  // ==================================
+                  // FIXED REGISTRATION COLUMN
+                  // ==================================
 
+                  DataTable(
+                    border: TableBorder.all(),
 
-                    // Date columns
-                    ...dates.map(
-                          (date) {
-                        return DataColumn(
-                          label: Text(
-                            date,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
+                    columns: const [
+                      DataColumn(
+                        label: Text(
+                          "Registration",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
                           ),
-                        );
-                      },
-                    ),
-
-                    // Present column
-                    const DataColumn(
-                      label: Text(
-                        "Present",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ),
+                    ],
 
-// Absent column
-                    const DataColumn(
-                      label: Text(
-                        "Absent",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-
-// Percentage column
-                    const DataColumn(
-                      label: Text(
-                        "Percentage",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  // Create a row for every student
-                  rows: List.generate(
-                    registrationNumbers.length,
-                        (studentIndex) {
-
-                          int presentCount = attendance[studentIndex]
-                              .where((present) => present)
-                              .length;
-
-                          int absentCount = dates.length - presentCount;
-
-                      return DataRow(
-                        cells: [
-
-                          // Registration number
-                          DataCell(
-                            Text(
-                              registrationNumbers[
-                              studentIndex],
-                            ),
-                          ),
-
-                          // Attendance checkbox
-                          ...List.generate(
-                            dates.length,
-                                (dateIndex) {
-
-                                  return DataCell(
-                                    Container(
-                                      width: 60,
-                                      height: 48,
-
-                                      color: highlighted[studentIndex][dateIndex]
-                                          ? Colors.yellow
-                                          : Colors.transparent,
-
-                                      alignment: Alignment.center,
-
-                                      child: GestureDetector(
-                                        onDoubleTap: () {
-                                          setState(() {
-                                            highlighted[studentIndex][dateIndex] =
-                                            !highlighted[studentIndex][dateIndex];
-                                          });
-                                        },
-
-                                        child: Checkbox(
-                                          value: attendance[studentIndex][dateIndex],
-
-                                          activeColor: Colors.green,
-                                          checkColor: Colors.white,
-
-                                          onChanged: (value) {
-                                            setState(() {
-                                              attendance[studentIndex][dateIndex] =
-                                                  value ?? false;
-                                            });
-                                          },
-                                        ),
-                                      ),
-                                    ),
-                                  );
+                    rows: List.generate(
+                      registrationNumbers.length,
+                          (studentIndex) {
+                        return DataRow(
+                          color: MaterialStateProperty
+                              .resolveWith<Color?>(
+                                (states) {
+                              return studentIndex.isEven
+                                  ? Colors.lightBlue.shade50
+                                  : Colors.white;
                             },
                           ),
 
+                          cells: [
+                            DataCell(
+                              Text(
+                                registrationNumbers[
+                                studentIndex],
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
 
+                  // ==================================
+                  // SCROLLABLE PART
+                  // ==================================
 
-// Percentage
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+
+                      child: DataTable(
+                        border: TableBorder.all(),
+
+                        // ==================================
+                        // COLUMNS
+                        // ==================================
+
+                        columns: [
+
+                          // Date columns
+                          ...dates.map(
+                                (date) {
+                              return DataColumn(
+                                label: Text(
+                                  date,
+                                  style:
+                                  const TextStyle(
+                                    fontWeight:
+                                    FontWeight.bold,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+
                           // Present
-                          DataCell(
-                            Text(
-                              presentCount.toString(),
+                          const DataColumn(
+                            label: Text(
+                              "Present",
+                              style: TextStyle(
+                                fontWeight:
+                                FontWeight.bold,
+                              ),
                             ),
                           ),
 
-// Absent
-                          DataCell(
-                            Text(
-                              absentCount.toString(),
+                          // Absent
+                          const DataColumn(
+                            label: Text(
+                              "Absent",
+                              style: TextStyle(
+                                fontWeight:
+                                FontWeight.bold,
+                              ),
                             ),
                           ),
 
-// Percentage
-                          DataCell(
-                            Text(
-                              "${getPercentage(studentIndex).toStringAsFixed(1)}%",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                          // Percentage
+                          const DataColumn(
+                            label: Text(
+                              "Percentage",
+                              style: TextStyle(
+                                fontWeight:
+                                FontWeight.bold,
                               ),
                             ),
                           ),
                         ],
-                      );
-                    },
+
+                        // ==================================
+                        // ROWS
+                        // ==================================
+
+                        rows: List.generate(
+                          registrationNumbers.length,
+                              (studentIndex) {
+
+                            int presentCount =
+                                attendance[
+                                studentIndex]
+                                    .where(
+                                        (present) =>
+                                    present)
+                                    .length;
+
+                            int absentCount =
+                                dates.length -
+                                    presentCount;
+
+                            return DataRow(
+                              color:
+                              MaterialStateProperty
+                                  .resolveWith<
+                                  Color?>(
+                                    (states) {
+                                  return studentIndex
+                                      .isEven
+                                      ? Colors
+                                      .lightBlue
+                                      .shade50
+                                      : Colors.white;
+                                },
+                              ),
+
+                              cells: [
+
+                                // ==================================
+                                // ATTENDANCE CHECKBOXES
+                                // ==================================
+
+                                ...List.generate(
+                                  dates.length,
+                                      (dateIndex) {
+
+                                    return DataCell(
+                                      Container(
+                                        width: 60,
+                                        height: 48,
+
+                                        color: highlighted[
+                                        studentIndex]
+                                        [dateIndex]
+                                            ? Colors.yellow
+                                            : Colors
+                                            .transparent,
+
+                                        alignment:
+                                        Alignment.center,
+
+                                        child:
+                                        GestureDetector(
+                                          onDoubleTap: () {
+                                            setState(() {
+                                              highlighted[
+                                              studentIndex]
+                                              [dateIndex] =
+                                              !highlighted[
+                                              studentIndex]
+                                              [
+                                              dateIndex];
+                                            });
+                                          },
+
+                                          child: Checkbox(
+                                            value: attendance[
+                                            studentIndex]
+                                            [
+                                            dateIndex],
+
+                                            activeColor:
+                                            Colors.green,
+
+                                            checkColor:
+                                            Colors.white,
+
+                                            onChanged:
+                                                (value) {
+                                              setState(() {
+                                                attendance[
+                                                studentIndex]
+                                                [
+                                                dateIndex] =
+                                                    value ??
+                                                        false;
+                                              });
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+
+                                // ==================================
+                                // PRESENT
+                                // ==================================
+
+                                DataCell(
+                                  Text(
+                                    presentCount
+                                        .toString(),
+                                  ),
+                                ),
+
+                                // ==================================
+                                // ABSENT
+                                // ==================================
+
+                                DataCell(
+                                  Text(
+                                    absentCount
+                                        .toString(),
+                                  ),
+                                ),
+
+                                // ==================================
+                                // PERCENTAGE
+                                // ==================================
+
+                                DataCell(
+                                  Text(
+                                    "${getPercentage(studentIndex).toStringAsFixed(1)}%",
+                                    style:
+                                    const TextStyle(
+                                      fontWeight:
+                                      FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
-          ),Padding(
+          ),
+
+          // ====================================
+          // SHARE BUTTON
+          // ====================================
+
+          Padding(
             padding: const EdgeInsets.all(12),
 
             child: SizedBox(
@@ -368,7 +508,9 @@ class _AttendancePageState extends State<AttendancePage> {
               child: ElevatedButton.icon(
                 onPressed: shareAttendance,
                 icon: const Icon(Icons.share),
-                label: const Text("Share Attendance"),
+                label: const Text(
+                  "Share Attendance",
+                ),
               ),
             ),
           ),
