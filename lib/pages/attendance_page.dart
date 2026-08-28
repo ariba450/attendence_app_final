@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
+
 
 class AttendancePage extends StatefulWidget {
   const AttendancePage({super.key});
@@ -22,34 +22,7 @@ class _AttendancePageState extends State<AttendancePage> {
   // Stores highlighted attendance cells
   List<List<bool>> highlighted = [];
 
-  void shareAttendance() {
-    String message = "Attendance Report\n\n";
 
-    for (int studentIndex = 0;
-    studentIndex < registrationNumbers.length;
-    studentIndex++) {
-
-      int presentCount = attendance[studentIndex]
-          .where((present) => present)
-          .length;
-
-      int absentCount = dates.length - presentCount;
-
-      message +=
-      "Registration: ${registrationNumbers[studentIndex]}\n"
-          "Present: $presentCount\n"
-          "Absent: $absentCount\n"
-          "Percentage: "
-          "${getPercentage(studentIndex).toStringAsFixed(1)}%\n\n";
-    }
-
-    SharePlus.instance.share(
-      ShareParams(
-        text: message,
-        subject: "Attendance Report",
-      ),
-    );
-  }
   // Add a student
   void addStudent() {
     final TextEditingController controller =
@@ -357,18 +330,6 @@ class _AttendancePageState extends State<AttendancePage> {
                     },
                   ),
                 ),
-              ),
-            ),
-          ),Padding(
-            padding: const EdgeInsets.all(12),
-
-            child: SizedBox(
-              width: double.infinity,
-
-              child: ElevatedButton.icon(
-                onPressed: shareAttendance,
-                icon: const Icon(Icons.share),
-                label: const Text("Share Attendance"),
               ),
             ),
           ),
