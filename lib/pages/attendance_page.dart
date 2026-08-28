@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 
 
 class AttendancePage extends StatefulWidget {
-  const AttendancePage({super.key});
+  final String courseName;
+
+  const AttendancePage({
+    super.key,
+    required this.courseName,
+  });
 
   @override
   State<AttendancePage> createState() => _AttendancePageState();
@@ -139,6 +144,21 @@ class _AttendancePageState extends State<AttendancePage> {
 
       body: Column(
         children: [
+
+          //Course name
+          Padding(
+            padding: const EdgeInsets.only(
+              top: 16,
+              bottom: 8,
+            ),
+            child: Text(
+              widget.courseName,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
 
           // Buttons
           Padding(

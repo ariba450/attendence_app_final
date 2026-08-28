@@ -134,9 +134,11 @@ class LoginPage extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => AttendancePage(),
+                      builder: (context) => const AttendancePage(
+                        courseName: "Data Structures",
+                      ),
                     ),
-                  );
+                    );
                 },
 
                 style: ElevatedButton.styleFrom(
