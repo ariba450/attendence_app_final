@@ -1,66 +1,82 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
+
+import 'login_page.dart';
 
 class AttendancePage extends StatefulWidget {
-  const AttendancePage({super.key});
+  final String courseName;
+  final bool isTeacher;
+
+  const AttendancePage({
+    super.key,
+    required this.courseName,
+    this.isTeacher = false,
+  });
 
   @override
   State<AttendancePage> createState() => _AttendancePageState();
 }
 
 class _AttendancePageState extends State<AttendancePage> {
-  // Stores registration numbers
-  List<String> registrationNumbers = [];
+  // ==========================================
+  // SCROLL CONTROLLERS
+  // ==========================================
+  final ScrollController _leftVerticalController = ScrollController();
+  final ScrollController _rightVerticalController = ScrollController();
+  final ScrollController _horizontalController = ScrollController();
 
-  // Stores dates
-  List<String> dates = [];
+  bool _isSyncingLeft = false;
+  bool _isSyncingRight = false;
 
-  // Stores attendance
-  // true = present
-  // false = absent
-  List<List<bool>> attendance = [];
-  // Stores highlighted attendance cells
-  List<List<bool>> highlighted = [];
+  @override
+  void initState() {
+    super.initState();
 
-  void shareAttendance() {
-    String message = "Attendance Report\n\n";
+    _leftVerticalController.addListener(() {
+      if (_isSyncingRight) return;
+      _isSyncingLeft = true;
+      if (_rightVerticalController.hasClients) {
+        _rightVerticalController.jumpTo(_leftVerticalController.offset);
+      }
+      _isSyncingLeft = false;
+    });
 
-    for (int studentIndex = 0;
-    studentIndex < registrationNumbers.length;
-    studentIndex++) {
-
-      int presentCount = attendance[studentIndex]
-          .where((present) => present)
-          .length;
-
-      int absentCount = dates.length - presentCount;
-
-      message +=
-      "Registration: ${registrationNumbers[studentIndex]}\n"
-          "Present: $presentCount\n"
-          "Absent: $absentCount\n"
-          "Percentage: "
-          "${getPercentage(studentIndex).toStringAsFixed(1)}%\n\n";
-    }
-
-    SharePlus.instance.share(
-      ShareParams(
-        text: message,
-        subject: "Attendance Report",
-      ),
-    );
+    _rightVerticalController.addListener(() {
+      if (_isSyncingLeft) return;
+      _isSyncingRight = true;
+      if (_leftVerticalController.hasClients) {
+        _leftVerticalController.jumpTo(_rightVerticalController.offset);
+      }
+      _isSyncingRight = false;
+    });
   }
-  // Add a student
-  void addStudent() {
-    final TextEditingController controller =
-    TextEditingController();
+
+  @override
+  void dispose() {
+    _leftVerticalController.dispose();
+    _rightVerticalController.dispose();
+    _horizontalController.dispose();
+    super.dispose();
+  }
+
+  // Document reference for current course in Firestore
+  DocumentReference get _courseDoc => FirebaseFirestore.instance
+      .collection('courses')
+      .doc(widget.courseName.replaceAll(' ', ''));
+
+  // ==========================================
+  // FIRESTORE ACTIONS (TEACHER ONLY)
+  // ==========================================
+
+  Future<void> _addStudent() async {
+    final TextEditingController controller = TextEditingController();
 
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: const Text("Add Student"),
-
           content: TextField(
             controller: controller,
             decoration: const InputDecoration(
@@ -68,41 +84,21 @@ class _AttendancePageState extends State<AttendancePage> {
               border: OutlineInputBorder(),
             ),
           ),
-
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
+              onPressed: () => Navigator.pop(context),
               child: const Text("Cancel"),
             ),
-
             ElevatedButton(
-              onPressed: () {
-                if (controller.text.trim().isNotEmpty) {
-                  setState(() {
-                    registrationNumbers.add(
-                      controller.text.trim(),
-                    );
+              onPressed: () async {
+                final regNumber = controller.text.trim();
+                if (regNumber.isNotEmpty) {
+                  // Appends new student to existing array in Firestore
+                  await _courseDoc.set({
+                    'students': FieldValue.arrayUnion([regNumber]),
+                  }, SetOptions(merge: true));
 
-                    // Create attendance values
-                    // for all existing dates.
-                    attendance.add(
-                      List.generate(
-                        dates.length,
-                            (index) => false,
-                      ),
-                    );
-
-                    highlighted.add(
-                      List.generate(
-                        dates.length,
-                            (index) => false,
-                      ),
-                    );
-                  });
-
-                  Navigator.pop(context);
+                  if (mounted) Navigator.pop(context);
                 }
               },
               child: const Text("Add"),
@@ -113,41 +109,72 @@ class _AttendancePageState extends State<AttendancePage> {
     );
   }
 
-  // Add a new date
-  void addDate() {
+  Future<void> _addDate() async {
     final now = DateTime.now();
+    final dateStr = "${now.day}-${now.month}-${now.year}";
 
-    String newDate =
-        "${now.day}/${now.month}/${now.year}";
-
-    setState(() {
-      dates.add(newDate);
-
-      // Add false for the new date
-      // for every existing student.
-      for (int i = 0; i < attendance.length; i++) {
-        attendance[i].add(false);
-        highlighted[i].add(false);
-      }
-    });
+    await _courseDoc.set({
+      'dates': FieldValue.arrayUnion([dateStr]),
+    }, SetOptions(merge: true));
   }
 
-  // Calculate attendance percentage
-  double getPercentage(int studentIndex) {
-    if (dates.isEmpty) {
-      return 0;
-    }
-
-    int presentCount = 0;
-
-    for (int i = 0; i < dates.length; i++) {
-      if (attendance[studentIndex][i]) {
-        presentCount++;
-      }
-    }
-
-    return (presentCount / dates.length) * 100;
+  Future<void> _toggleAttendance(
+      String studentId,
+      String dateStr,
+      bool currentStatus,
+      ) async {
+    await _courseDoc.collection('records').doc(dateStr).set({
+      studentId: !currentStatus,
+    }, SetOptions(merge: true));
   }
+
+  // ==========================================
+  // LOGOUT HANDLER
+  // ==========================================
+
+  Future<void> _handleLogout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Log Out"),
+        content: const Text("Are you sure you want to log out?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Log Out"),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout == true) {
+      await FirebaseAuth.instance.signOut();
+
+      if (!mounted) return;
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+            (route) => false,
+      );
+    }
+  }
+
+  Color _getRowColor(int index) {
+    return index.isEven ? Colors.lightBlue.shade50 : Colors.white;
+  }
+
+  // ==========================================
+  // BUILD METHOD
+  // ==========================================
 
   @override
   Widget build(BuildContext context) {
@@ -155,224 +182,259 @@ class _AttendancePageState extends State<AttendancePage> {
       appBar: AppBar(
         title: const Text(
           "Attendance",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         backgroundColor: Colors.blue,
-      ),
-
-      body: Column(
-        children: [
-
-          // Buttons
-          Padding(
-            padding: const EdgeInsets.all(12),
-
-            child: Row(
-              children: [
-
-                ElevatedButton.icon(
-                  onPressed: addStudent,
-                  icon: const Icon(Icons.person_add),
-                  label: const Text("Add Student"),
-                ),
-
-                const SizedBox(width: 10),
-
-                ElevatedButton.icon(
-                  onPressed: addDate,
-                  icon: const Icon(Icons.calendar_month),
-                  label: const Text("Add Date"),
-                ),
-              ],
-            ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            tooltip: 'Log Out',
+            onPressed: _handleLogout,
           ),
+        ],
+      ),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: _courseDoc.snapshots(),
+        builder: (context, courseSnapshot) {
+          if (courseSnapshot.hasError) {
+            return Center(child: Text("Error: ${courseSnapshot.error}"));
+          }
+          if (courseSnapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-          const Divider(),
+          if (!courseSnapshot.hasData || !courseSnapshot.data!.exists) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  "Course '${widget.courseName}' not initialized in Firestore backend yet.",
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+              ),
+            );
+          }
 
-          // Attendance table
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
+          final courseData =
+              courseSnapshot.data!.data() as Map<String, dynamic>? ?? {};
 
-              child: SingleChildScrollView(
-                scrollDirection: Axis.vertical,
+          // Reads directly from backend (the manually created list + any teacher additions)
+          final List<String> students = List<String>.from(
+            courseData['students'] ?? [],
+          );
+          final List<String> dates = List<String>.from(
+            courseData['dates'] ?? [],
+          );
 
-                child: DataTable(
-                  border: TableBorder.all(),
+          return StreamBuilder<QuerySnapshot>(
+            stream: _courseDoc.collection('records').snapshots(),
+            builder: (context, recordsSnapshot) {
+              final Map<String, Map<String, bool>> attendanceMap = {};
 
-                  columns: [
-                    // Registration column
-                    const DataColumn(
-                      label: Text(
-                        "Registration",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
+              if (recordsSnapshot.hasData) {
+                for (var doc in recordsSnapshot.data!.docs) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  attendanceMap[doc.id] = data.map(
+                        (key, value) => MapEntry(key, value as bool),
+                  );
+                }
+              }
+
+              return Column(
+                children: [
+                  // Course Header
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16, bottom: 8),
+                    child: Text(
+                      widget.courseName,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
                       ),
                     ),
+                  ),
 
-
-                    // Date columns
-                    ...dates.map(
-                          (date) {
-                        return DataColumn(
-                          label: Text(
-                            date,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
+                  // Action Buttons (Teacher Only)
+                  if (widget.isTeacher)
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: _addStudent,
+                            icon: const Icon(Icons.person_add),
+                            label: const Text("Add Student"),
                           ),
-                        );
-                      },
-                    ),
-
-                    // Present column
-                    const DataColumn(
-                      label: Text(
-                        "Present",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-
-// Absent column
-                    const DataColumn(
-                      label: Text(
-                        "Absent",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-
-// Percentage column
-                    const DataColumn(
-                      label: Text(
-                        "Percentage",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  // Create a row for every student
-                  rows: List.generate(
-                    registrationNumbers.length,
-                        (studentIndex) {
-
-                          int presentCount = attendance[studentIndex]
-                              .where((present) => present)
-                              .length;
-
-                          int absentCount = dates.length - presentCount;
-
-                      return DataRow(
-                        cells: [
-
-                          // Registration number
-                          DataCell(
-                            Text(
-                              registrationNumbers[
-                              studentIndex],
-                            ),
+                          const SizedBox(width: 10),
+                          ElevatedButton.icon(
+                            onPressed: _addDate,
+                            icon: const Icon(Icons.calendar_month),
+                            label: const Text("Add Date"),
                           ),
+                        ],
+                      ),
+                    ),
 
-                          // Attendance checkbox
-                          ...List.generate(
-                            dates.length,
-                                (dateIndex) {
+                  const Divider(),
 
-                                  return DataCell(
-                                    Container(
-                                      width: 60,
-                                      height: 48,
+                  // Table Body
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Fixed Registration Column
+                        SingleChildScrollView(
+                          controller: _leftVerticalController,
+                          child: DataTable(
+                            border: TableBorder.all(
+                              color: Colors.grey.shade300,
+                            ),
+                            columns: const [
+                              DataColumn(
+                                label: Text(
+                                  "Registration",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            rows: List.generate(students.length, (index) {
+                              return DataRow(
+                                color: WidgetStateProperty.all(
+                                  _getRowColor(index),
+                                ),
+                                cells: [
+                                  DataCell(Text(students[index])),
+                                ],
+                              );
+                            }),
+                          ),
+                        ),
 
-                                      color: highlighted[studentIndex][dateIndex]
-                                          ? Colors.yellow
-                                          : Colors.transparent,
-
-                                      alignment: Alignment.center,
-
-                                      child: GestureDetector(
-                                        onDoubleTap: () {
-                                          setState(() {
-                                            highlighted[studentIndex][dateIndex] =
-                                            !highlighted[studentIndex][dateIndex];
-                                          });
-                                        },
-
-                                        child: Checkbox(
-                                          value: attendance[studentIndex][dateIndex],
-
-                                          activeColor: Colors.green,
-                                          checkColor: Colors.white,
-
-                                          onChanged: (value) {
-                                            setState(() {
-                                              attendance[studentIndex][dateIndex] =
-                                                  value ?? false;
-                                            });
-                                          },
+                        // Scrollable Data Columns
+                        Expanded(
+                          child: SingleChildScrollView(
+                            controller: _horizontalController,
+                            scrollDirection: Axis.horizontal,
+                            child: SingleChildScrollView(
+                              controller: _rightVerticalController,
+                              scrollDirection: Axis.vertical,
+                              child: DataTable(
+                                border: TableBorder.all(
+                                  color: Colors.grey.shade300,
+                                ),
+                                columns: [
+                                  ...dates.map(
+                                        (date) => DataColumn(
+                                      label: Text(
+                                        date,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                     ),
+                                  ),
+                                  const DataColumn(
+                                    label: Text(
+                                      "Present",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  const DataColumn(
+                                    label: Text(
+                                      "Absent",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  const DataColumn(
+                                    label: Text(
+                                      "Percentage",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                rows: List.generate(students.length, (
+                                    studentIndex,
+                                    ) {
+                                  final studentId = students[studentIndex];
+                                  int presentCount = 0;
+
+                                  for (var date in dates) {
+                                    if (attendanceMap[date]?[studentId] ==
+                                        true) {
+                                      presentCount++;
+                                    }
+                                  }
+
+                                  final absentCount =
+                                      dates.length - presentCount;
+                                  final percentage = dates.isEmpty
+                                      ? 0.0
+                                      : (presentCount / dates.length) * 100;
+
+                                  return DataRow(
+                                    color: WidgetStateProperty.all(
+                                      _getRowColor(studentIndex),
+                                    ),
+                                    cells: [
+                                      // Attendance Checkboxes
+                                      ...dates.map((dateStr) {
+                                        final isPresent =
+                                            attendanceMap[dateStr]?[studentId] ??
+                                                false;
+
+                                        return DataCell(
+                                          Center(
+                                            child: Checkbox(
+                                              value: isPresent,
+                                              activeColor: Colors.green,
+                                              onChanged: widget.isTeacher
+                                                  ? (_) => _toggleAttendance(
+                                                studentId,
+                                                dateStr,
+                                                isPresent,
+                                              )
+                                                  : null, // Read-only for students
+                                            ),
+                                          ),
+                                        );
+                                      }),
+
+                                      DataCell(Text(presentCount.toString())),
+                                      DataCell(Text(absentCount.toString())),
+                                      DataCell(
+                                        Text(
+                                          "${percentage.toStringAsFixed(1)}%",
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   );
-                            },
-                          ),
-
-
-
-// Percentage
-                          // Present
-                          DataCell(
-                            Text(
-                              presentCount.toString(),
-                            ),
-                          ),
-
-// Absent
-                          DataCell(
-                            Text(
-                              absentCount.toString(),
-                            ),
-                          ),
-
-// Percentage
-                          DataCell(
-                            Text(
-                              "${getPercentage(studentIndex).toStringAsFixed(1)}%",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                                }),
                               ),
                             ),
                           ),
-                        ],
-                      );
-                    },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ),
-            ),
-          ),Padding(
-            padding: const EdgeInsets.all(12),
-
-            child: SizedBox(
-              width: double.infinity,
-
-              child: ElevatedButton.icon(
-                onPressed: shareAttendance,
-                icon: const Icon(Icons.share),
-                label: const Text("Share Attendance"),
-              ),
-            ),
-          ),
-        ],
+                ],
+              );
+            },
+          );
+        },
       ),
     );
   }

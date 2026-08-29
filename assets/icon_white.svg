@@ -1,0 +1,18 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Square White Background -->
+  <rect width="1024" height="1024" rx="350" ry="350" fill="#FFFFFF"/>
+  
+  <!-- "A" Frame -->
+  <path d="M280 820 L490 220 C498 195 526 195 534 220 L744 820" 
+        stroke="#111827" 
+        stroke-width="48" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"/>
+        
+  <!-- Blue Tick -->
+  <path d="M315 480 L465 600 L850 270" 
+        stroke="#00A3FF" 
+        stroke-width="72" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"/>
+</svg>
