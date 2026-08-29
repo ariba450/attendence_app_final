@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 import 'login_page.dart';
 
 class AttendancePage extends StatefulWidget {
+  final String courseDocId;
   final String courseName;
   final bool isTeacher;
 
   const AttendancePage({
     super.key,
+    required this.courseDocId,
     required this.courseName,
     this.isTeacher = false,
   });
@@ -19,9 +21,6 @@ class AttendancePage extends StatefulWidget {
 }
 
 class _AttendancePageState extends State<AttendancePage> {
-  // ==========================================
-  // SCROLL CONTROLLERS
-  // ==========================================
   final ScrollController _leftVerticalController = ScrollController();
   final ScrollController _rightVerticalController = ScrollController();
   final ScrollController _horizontalController = ScrollController();
@@ -60,14 +59,9 @@ class _AttendancePageState extends State<AttendancePage> {
     super.dispose();
   }
 
-  // Document reference for current course in Firestore
   DocumentReference get _courseDoc => FirebaseFirestore.instance
       .collection('courses')
-      .doc(widget.courseName.replaceAll(' ', ''));
-
-  // ==========================================
-  // FIRESTORE ACTIONS (TEACHER ONLY)
-  // ==========================================
+      .doc(widget.courseDocId);
 
   Future<void> _addStudent() async {
     final TextEditingController controller = TextEditingController();
@@ -93,7 +87,6 @@ class _AttendancePageState extends State<AttendancePage> {
               onPressed: () async {
                 final regNumber = controller.text.trim();
                 if (regNumber.isNotEmpty) {
-                  // Appends new student to existing array in Firestore
                   await _courseDoc.set({
                     'students': FieldValue.arrayUnion([regNumber]),
                   }, SetOptions(merge: true));
@@ -128,10 +121,6 @@ class _AttendancePageState extends State<AttendancePage> {
     }, SetOptions(merge: true));
   }
 
-  // ==========================================
-  // LOGOUT HANDLER
-  // ==========================================
-
   Future<void> _handleLogout() async {
     final shouldLogout = await showDialog<bool>(
       context: context,
@@ -157,7 +146,6 @@ class _AttendancePageState extends State<AttendancePage> {
 
     if (shouldLogout == true) {
       await FirebaseAuth.instance.signOut();
-
       if (!mounted) return;
 
       Navigator.pushAndRemoveUntil(
@@ -172,10 +160,6 @@ class _AttendancePageState extends State<AttendancePage> {
     return index.isEven ? Colors.lightBlue.shade50 : Colors.white;
   }
 
-  // ==========================================
-  // BUILD METHOD
-  // ==========================================
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -186,6 +170,10 @@ class _AttendancePageState extends State<AttendancePage> {
         ),
         centerTitle: true,
         backgroundColor: Colors.blue,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
@@ -209,7 +197,7 @@ class _AttendancePageState extends State<AttendancePage> {
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Text(
-                  "Course '${widget.courseName}' not initialized in Firestore backend yet.",
+                  "Course '${widget.courseName}' not initialized in Firestore yet.",
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 16, color: Colors.grey),
                 ),
@@ -220,7 +208,6 @@ class _AttendancePageState extends State<AttendancePage> {
           final courseData =
               courseSnapshot.data!.data() as Map<String, dynamic>? ?? {};
 
-          // Reads directly from backend (the manually created list + any teacher additions)
           final List<String> students = List<String>.from(
             courseData['students'] ?? [],
           );
@@ -244,7 +231,6 @@ class _AttendancePageState extends State<AttendancePage> {
 
               return Column(
                 children: [
-                  // Course Header
                   Padding(
                     padding: const EdgeInsets.only(top: 16, bottom: 8),
                     child: Text(
@@ -256,8 +242,6 @@ class _AttendancePageState extends State<AttendancePage> {
                       ),
                     ),
                   ),
-
-                  // Action Buttons (Teacher Only)
                   if (widget.isTeacher)
                     Padding(
                       padding: const EdgeInsets.all(12),
@@ -277,15 +261,12 @@ class _AttendancePageState extends State<AttendancePage> {
                         ],
                       ),
                     ),
-
                   const Divider(),
-
-                  // Table Body
                   Expanded(
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Fixed Registration Column
+                        // Left Registration Column
                         SingleChildScrollView(
                           controller: _leftVerticalController,
                           child: DataTable(
@@ -314,8 +295,7 @@ class _AttendancePageState extends State<AttendancePage> {
                             }),
                           ),
                         ),
-
-                        // Scrollable Data Columns
+                        // Right Attendance Scrollable Data
                         Expanded(
                           child: SingleChildScrollView(
                             controller: _horizontalController,
@@ -387,7 +367,6 @@ class _AttendancePageState extends State<AttendancePage> {
                                       _getRowColor(studentIndex),
                                     ),
                                     cells: [
-                                      // Attendance Checkboxes
                                       ...dates.map((dateStr) {
                                         final isPresent =
                                             attendanceMap[dateStr]?[studentId] ??
@@ -404,12 +383,11 @@ class _AttendancePageState extends State<AttendancePage> {
                                                 dateStr,
                                                 isPresent,
                                               )
-                                                  : null, // Read-only for students
+                                                  : null,
                                             ),
                                           ),
                                         );
                                       }),
-
                                       DataCell(Text(presentCount.toString())),
                                       DataCell(Text(absentCount.toString())),
                                       DataCell(

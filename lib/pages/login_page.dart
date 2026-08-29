@@ -1,9 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'attendance_page.dart';
+import 'course_list_page.dart';
 import 'signup_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -48,10 +48,21 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       String? accountEmail;
+      String userCodeId = inputId;
 
-      // 1. If user typed a direct email, use it; otherwise perform Firestore ID lookup
+      // 1. Resolve Auth Email and userCodeId
       if (inputId.contains('@')) {
         accountEmail = inputId;
+
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .where('email', isEqualTo: inputId)
+            .limit(1)
+            .get();
+
+        if (userDoc.docs.isNotEmpty) {
+          userCodeId = userDoc.docs.first.data()['userCodeId'] ?? inputId;
+        }
       } else {
         final userQuery = await FirebaseFirestore.instance
             .collection('users')
@@ -73,7 +84,7 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      // 2. Sign in with mapped email and password
+      // 2. Sign in with mapped email
       final userCredential =
       await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: accountEmail,
@@ -82,7 +93,7 @@ class _LoginPageState extends State<LoginPage> {
 
       final user = userCredential.user;
 
-      // 3. Enforce Email Verification for Students
+      // 3. Email Verification check for Students
       if (selectedRole == "Student" && user != null && !user.emailVerified) {
         await FirebaseAuth.instance.signOut();
         _showErrorSnackBar(
@@ -93,13 +104,13 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
 
-      // 4. Navigate to main attendance page
+      // 4. Navigate to Course Selection List Page
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => AttendancePage(
-            courseName: "Project 250",
-            isTeacher: selectedRole == "Teacher",
+          builder: (context) => CourseListPage(
+            userCodeId: userCodeId,
+            role: selectedRole,
           ),
         ),
       );
@@ -162,7 +173,6 @@ class _LoginPageState extends State<LoginPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Logo
                 Center(
                   child: SvgPicture.asset(
                     'assets/icon_white.svg',
@@ -181,8 +191,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 28),
-
-                // Simple Role Selection Segmented Control
                 SegmentedButton<String>(
                   segments: const [
                     ButtonSegment(
@@ -204,8 +212,6 @@ class _LoginPageState extends State<LoginPage> {
                   },
                 ),
                 const SizedBox(height: 20),
-
-                // ID Input Field
                 TextField(
                   controller: _idController,
                   focusNode: _idFocusNode,
@@ -219,8 +225,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // Password Field
                 TextField(
                   controller: _passwordController,
                   focusNode: _passwordFocusNode,
@@ -246,8 +250,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 24),
-
-                // Submit Button
                 SizedBox(
                   height: 48,
                   child: ElevatedButton(
@@ -275,8 +277,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // Switch to Signup Page
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
