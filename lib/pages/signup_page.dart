@@ -77,28 +77,32 @@ class _SignUpPageState extends State<SignUpPage> {
       _isLoading = true;
     });
 
+    UserCredential? userCredential;
+
     try {
-      // 4. Check if ID is already registered for this role in Firestore
-      final existingUserQuery = await FirebaseFirestore.instance
-          .collection('users')
-          .where('userCodeId', isEqualTo: id)
-          .where('role', isEqualTo: selectedRole)
-          .limit(1)
-          .get();
-
-      if (existingUserQuery.docs.isNotEmpty) {
-        _showMessage("This $selectedRole ID is already registered.");
-        return;
-      }
-
-      // 5. Create Firebase Auth User
-      final userCredential = await FirebaseAuth.instance
+      // 4. Create Firebase Auth User FIRST (Authenticated Context established)
+      userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
 
       final user = userCredential.user;
 
       if (user != null) {
-        // 6. Save User Document to Firestore for ID Lookup on Login
+        // 5. Check if ID is already registered for this role in Firestore
+        final existingUserQuery = await FirebaseFirestore.instance
+            .collection('users')
+            .where('userCodeId', isEqualTo: id)
+            .where('role', isEqualTo: selectedRole)
+            .limit(1)
+            .get();
+
+        if (existingUserQuery.docs.isNotEmpty) {
+          // Rollback: Delete newly created auth user since ID is taken
+          await user.delete();
+          _showMessage("This $selectedRole ID is already registered.");
+          return;
+        }
+
+        // 6. Save User Document to Firestore
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'uid': user.uid,
           'userCodeId': id,
@@ -107,8 +111,10 @@ class _SignUpPageState extends State<SignUpPage> {
           'createdAt': FieldValue.serverTimestamp(),
         });
 
-        // 7. Send Verification Email for Students (or teachers if required)
-        await user.sendEmailVerification();
+        // 7. Send Verification Email for Students
+        if (selectedRole == "Student") {
+          await user.sendEmailVerification();
+        }
 
         // 8. Sign out immediately so AuthState stream does not bypass login screen
         await FirebaseAuth.instance.signOut();
@@ -158,6 +164,10 @@ class _SignUpPageState extends State<SignUpPage> {
       }
       _showMessage(errorMessage);
     } on FirebaseException catch (e) {
+      // Rollback auth user if firestore write fails
+      if (userCredential?.user != null) {
+        await userCredential!.user!.delete();
+      }
       _showMessage("Database Error [${e.code}]: ${e.message}");
     } catch (e) {
       _showMessage("Error: ${e.toString()}");
@@ -200,7 +210,6 @@ class _SignUpPageState extends State<SignUpPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Logo
                 Center(
                   child: SvgPicture.asset(
                     'assets/icon_white.svg',
@@ -219,8 +228,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
                 const SizedBox(height: 28),
-
-                // Role Selection Segmented Control
                 SegmentedButton<String>(
                   segments: const [
                     ButtonSegment(
@@ -242,8 +249,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   },
                 ),
                 const SizedBox(height: 20),
-
-                // ID Input Field
                 TextField(
                   controller: _idController,
                   focusNode: _idFocusNode,
@@ -257,8 +262,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // Email Input Field
                 TextField(
                   controller: _emailController,
                   focusNode: _emailFocusNode,
@@ -273,8 +276,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // Password Input Field
                 TextField(
                   controller: _passwordController,
                   focusNode: _passwordFocusNode,
@@ -299,8 +300,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // Confirm Password Input Field
                 TextField(
                   controller: _confirmPasswordController,
                   focusNode: _confirmPasswordFocusNode,
@@ -326,8 +325,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
                 const SizedBox(height: 24),
-
-                // Register Button
                 SizedBox(
                   height: 48,
                   child: ElevatedButton(
@@ -355,8 +352,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // Switch Back to Login
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
